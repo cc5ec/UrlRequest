@@ -8,6 +8,9 @@ from gzip import GzipFile
 from StringIO import StringIO
 
 
+class UrlRequestException(Exception): pass
+
+
 class UrlRequestResponseData:
     def __init__(self, content=None, url=None, headers=None, code=None):
         self.content = content
@@ -50,6 +53,19 @@ class UrlRequest:
                 if item == handlerWantRemove:
                     handlerList.remove(item)
 
+    def EnableProxyHandler(self, proxyDict):
+        """Enable proxy handler
+        args:
+            proxyDict:proxy info for connect, eg. {'http':'10.182.45.231:80','https':'10.182.45.231:80'}
+        """
+        if not isinstance(proxyDict, dict):
+            raise UrlRequestException('you must specify proxyDict when enabled Proxy')
+        self.__opener.add_handler(urllib2.ProxyHandler(proxyDict))
+
+    def DisableProxyHandler(self):
+        """Disable proxy handler"""
+        self.__RemoveInstalledHandler('ProxyHandler')
+
     def EnableAutoRedirect(self):
         """Enable auto redirect 301,302... pages"""
         self.__opener.add_handler(urllib2.HTTPRedirectHandler())
@@ -67,18 +83,21 @@ class UrlRequest:
         """Disable cookie"""
         self.__RemoveInstalledHandler('HTTPCookieProcessor')
 
-    def Request(self, url, data=None, headers={}, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+    def Request(self, url, data=None, headers={}, timeout=30):
         if url is None or url == '':
             raise ValueError("Url can't be empty!")
         if 'user-agent' not in headers:
-            headers['user-agent'] = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101 Firefox/52.0'
+            headers['user-agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:53.0) Gecko/20100101 Firefox/53.0'
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = 'gzip'
         self.__opener.addheaders = headers.items()
 
         try:
             if data is not None:
-                req = self.__opener.open(url, data=urllib.urlencode(data), timeout=timeout)
+                if isinstance(data, dict):
+                    req = self.__opener.open(url, data=urllib.urlencode(data), timeout=timeout)
+                else:
+                    req = self.__opener.open(url, data=data, timeout=timeout)
             else:
                 req = self.__opener.open(url, timeout=timeout)
 
@@ -92,17 +111,10 @@ class UrlRequest:
             return resData
         except urllib2.HTTPError, e:
             return UrlRequestResponseData(e.fp.read(), '', e.headers, e.code)
-
-    def RequestHeader(self, url, data=None, headers={}, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
-        """Only Request header of the url, use HEAD method to request, we can use this test if a url is accessable"""
-        request = urllib2.Request(url, data=data, headers=headers)
-        request.get_method = lambda: 'HEAD'
-        req = urllib2.urlopen(request, timeout=timeout)
-        resData = UrlRequestResponseData(req.read(), req.geturl(), req.info().dict, req.getcode())
-        return resData
-
+        except (urllib2.URLError, socket.error, socket.timeout), e:
+            raise UrlRequestException(e)
 
 if __name__ == '__main__':
     r = UrlRequest()
-    d = r.RequestHeader('https://127.0.0.1')
+    d = r.Request('http://127.0.0.1:445')
     print d.headers
