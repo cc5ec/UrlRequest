@@ -103,16 +103,20 @@ class UrlRequest:
 
             if req.headers.get("content-encoding") == "gzip":
                 gz = GzipFile(fileobj=StringIO(req.read()))
-                resData = UrlRequestResponseData(gz.read(), req.geturl(), req.info().dict, req.getcode())
+                resData = UrlRequestResponseData(gz.read(), url, req.info().dict, req.getcode())
             else:
-                resData = UrlRequestResponseData(req.read(), req.geturl(), req.info().dict, req.getcode())
+                resData = UrlRequestResponseData(req.read(), url, req.info().dict, req.getcode())
             req.close()
 
             return resData
         except urllib2.HTTPError, e:
-            return UrlRequestResponseData(e.fp.read(), '', e.headers, e.code)
+            if e.headers.get("content-encoding") == "gzip":
+                gz = GzipFile(fileobj=StringIO(e.fp.read()))
+                return UrlRequestResponseData(gz.read(), url, e.headers, e.code)
+            else:
+                return UrlRequestResponseData(e.fp.read(), url, e.headers, e.code)
         except (urllib2.URLError, socket.error, socket.timeout), e:
-            raise UrlRequestException(e)
+            return UrlRequestResponseData(str(e), url, None, -1)
 
 if __name__ == '__main__':
     r = UrlRequest()
