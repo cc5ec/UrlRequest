@@ -19,9 +19,23 @@ class UrlRequestResponseData:
         self.code = code
 
 
+class UrlRequestHandler(urllib2.BaseHandler):
+    """Avoid request headers being replaced."""
+    handler_order = 10000
+
+    def http_request(self, request):
+        for name, value in self.parent.addheaders:
+            name = name.capitalize()
+            request.add_unredirected_header(name, value)
+        return request
+
+    def https_request(self, request):
+        return self.http_request(request)
+
 class UrlRequest:
     def __init__(self):
         self.__opener = urllib2.build_opener()
+        self.__opener.add_handler(UrlRequestHandler())
         self.EnableCookie()
 
     def __FindInstalledHandlers(self,handlerName):
