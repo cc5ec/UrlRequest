@@ -109,7 +109,7 @@ class UrlRequest:
         try:
             if data is not None:
                 if isinstance(data, dict):
-                    req = self.__opener.open(url, data=urllib.urlencode(data), timeout=timeout)
+                    req = self.__opener.open(url, data=urlencode(data), timeout=timeout)
                 else:
                     req = self.__opener.open(url, data=data, timeout=timeout)
             else:
@@ -117,20 +117,23 @@ class UrlRequest:
 
             if req.headers.get("content-encoding") == "gzip":
                 gz = GzipFile(fileobj=StringIO(req.read()))
-                resData = UrlRequestResponseData(gz.read(), url, req.info().dict, req.getcode())
+                resData = UrlRequestResponseData(gz.read(), req.geturl(), req.info().dict, req.getcode())
             else:
-                resData = UrlRequestResponseData(req.read(), url, req.info().dict, req.getcode())
+                resData = UrlRequestResponseData(req.read(), req.geturl(), req.info().dict, req.getcode())
             req.close()
 
             return resData
         except urllib2.HTTPError, e:
-            if e.headers.get("content-encoding") == "gzip":
-                gz = GzipFile(fileobj=StringIO(e.fp.read()))
-                return UrlRequestResponseData(gz.read(), url, e.headers, e.code)
-            else:
-                return UrlRequestResponseData(e.fp.read(), url, e.headers, e.code)
-        except (urllib2.URLError, socket.error, socket.timeout), e:
-            return UrlRequestResponseData(str(e), url, None, -1)
+            try:
+                if e.headers.get("content-encoding") == "gzip":
+                    gz = GzipFile(fileobj=StringIO(e.fp.read()))
+                    return UrlRequestResponseData(gz.read(), e.geturl(), e.headers, e.code)
+                else:
+                    return UrlRequestResponseData(e.fp.read(), e.geturl(), e.headers, e.code)
+            except socket.error:
+                return UrlRequestResponseData(str(traceback.format_exc()), url, None, -1)
+        except (urllib2.URLError, socket.error, socket.timeout, httplib.BadStatusLine), e:
+            return UrlRequestResponseData(str(traceback.format_exc()), url, None, -1)
 
 if __name__ == '__main__':
     r = UrlRequest()
